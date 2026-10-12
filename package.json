@@ -1,0 +1,39 @@
+{
+  "name": "dsh-composer-draft-cache",
+  "version": "0.1.0",
+  "description": "dsh给我记住：DSH 会话切换时独立保留未发送文字、图片和文件附件。dsh-geiwo-jizhu / Per-session composer draft cache.",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/BaoBao1996121/dsh-composer-draft-cache.git" },
+  "homepage": "https://github.com/BaoBao1996121/dsh-composer-draft-cache#readme",
+  "bugs": { "url": "https://github.com/BaoBao1996121/dsh-composer-draft-cache/issues" },
+  "engines": { "node": ">=22", "dsh": "0.2.0-rc.2" },
+  "keywords": ["dsh给我记住", "dsh-geiwo-jizhu", "deepseek-harness", "dsh-plugin", "draft-cache", "attachments"],
+  "scripts": { "test": "node --test client.test.mjs integration.test.mjs loader.test.mjs" },
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}

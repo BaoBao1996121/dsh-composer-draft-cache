@@ -1,0 +1,12 @@
+node_modules/
+*.tgz
+coverage/
+.env
+.env.*
+*.log
+*.bak
+deployment.json
+gui-verification.json
+release-verification.json
+.DS_Store
+Thumbs.db

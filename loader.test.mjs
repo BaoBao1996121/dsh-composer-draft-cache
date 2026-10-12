@@ -1,0 +1,36 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import vm from "node:vm";
+import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+const clientModulesBundle = process.env.DSH_CLIENT_MODULES_BUNDLE;
+const officialCheck = { skip: clientModulesBundle ? false : "Set DSH_CLIENT_MODULES_BUNDLE to an absolute official bundle path" };
+class Service { constructor(ctx) { this.ctx = ctx; } }
+test("current package resolves and registers resources in the official boot graph", officialCheck, async () => {
+  assert.ok(isAbsolute(clientModulesBundle), "DSH_CLIENT_MODULES_BUNDLE must be an absolute path");
+  const source = readFileSync(clientModulesBundle, "utf8");
+  const executable = source.replace(/^import .*;$/gm, "").replace(/^export .*;$/gm, "") + "\nthis.ClientModuleRegistry=ClientModuleRegistry; this.bootInjections=bootInjections;";
+  const require = createRequire(import.meta.url);
+  const packageEntry = require.resolve("dsh-composer-draft-cache");
+  assert.equal(packageEntry, fileURLToPath(new URL("./index.js", import.meta.url)));
+  assert.equal(require.resolve("dsh-composer-draft-cache/client"), fileURLToPath(new URL("./client.js", import.meta.url)));
+  const baseUrl = import.meta.url;
+  const registryCtx = { loader: { entries: () => [{ options: { name: packageEntry }, fiber: {}, disabled: false, parent: { tree: { ctx: { baseUrl } } } }] }, on() {}, inject() {}, logger: { warn() {}, error(error) { throw error; } } };
+  const sandbox = vm.createContext({ Service, createRequire, createHash, existsSync, readFileSync, statSync, dirname, isAbsolute, join, fileURLToPath, pathToFileURL, Buffer, URL, TextEncoder, Response, queueMicrotask });
+  vm.runInContext(executable, sandbox);
+  const registry = new sandbox.ClientModuleRegistry(registryCtx); const graph = registry.graph();
+  const row = graph.entries.find(entry => entry.id === "dsh-composer-draft-cache"); assert.ok(row);
+  assert.deepEqual(Array.from(row.inject), ["@deepseek-ai/dsh-api-session-controller", "@deepseek-ai/dsh-client-ui-conversation"]);
+  assert.equal(registry.clientPath(row.id), fileURLToPath(new URL("./client.js", import.meta.url)));
+  const batch = graph.batches.find(batch => batch.phase === "application"); assert.ok(batch);
+  const response = await registry.fetchBundle({ method: "GET", url: batch.url }); assert.equal(response.status, 200);
+  const built = await response.text(); let registration;
+  vm.runInNewContext(built, { window: { __ModuleLoader__: { load(value) { registration = value; } } } });
+  assert.equal(registration.id, row.id); const plugin = registration.factory();
+  assert.equal(plugin.name, row.id); assert.deepEqual(Array.from(plugin.inject), ["sessions", "conversation"]); assert.equal(typeof plugin.apply, "function");
+  const injection = sandbox.bootInjections(graph).find(row => row.name === "__DSH_BOOT__");
+  assert.ok(injection.value.entries.some(entry => entry.id === "dsh-composer-draft-cache"));
+});
